@@ -14,7 +14,8 @@ import { config } from "@/lib/config";
 import { payflow } from "@/lib/lazy-payflow";
 import { useWallet } from "@/lib/wallet";
 
-import { AddressLink, Badge, Empty, Notice, Panel, TxLink } from "@/components/ui";
+import { AddressDisplay } from "@/components/AddressDisplay";
+import { Badge, Empty, Notice, Panel, TxLink } from "@/components/ui";
 
 type ChargeRow = PlanCharge;
 
@@ -196,7 +197,7 @@ export function PlanPageClient({ planId }: PlanPageClientProps) {
           </div>
           <div>
             <label className="label">{tr("Merchant")}</label>
-            <AddressLink value={plan.merchant} />
+            <AddressDisplay value={plan.merchant} />
           </div>
           <div>
             <label className="label">{tr("Status")}</label>
@@ -226,7 +227,7 @@ export function PlanPageClient({ planId }: PlanPageClientProps) {
                   <tr key={c.txHash} className="border-t border-edge">
                     <td className="py-2">{c.mandateId}</td>
                     <td className="py-2">
-                      <AddressLink value={c.subscriber} />
+                      <AddressDisplay value={c.subscriber} />
                     </td>
                     <td className="py-2 text-right">{c.amount}{" "}{tr("XLM")}</td>
                     <td className="py-2 text-right">{c.fee}{" "}{tr("XLM")}</td>

@@ -80,7 +80,8 @@ function validatePlanNameLocal(name: string): string | null {
 
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { SectionShortcuts } from "@/components/SectionShortcuts";
-import { AddressLink, Badge, Empty, Notice, Panel, SkeletonRows, Stat, TimeAgo, TxLink } from "@/components/ui";
+import { AddressDisplay } from "@/components/AddressDisplay";
+import { Badge, Empty, Notice, Panel, SkeletonRows, Stat, TimeAgo, TxLink } from "@/components/ui";
 import { Search } from "@/components/Search";
 import { ConfirmDialog, confirmTitle } from "@/components/ConfirmDialog";
 import { observeContractRecord } from "@/lib/contract-compat";
@@ -2762,7 +2763,7 @@ export default function MerchantPage() {
                         >
                           #{m.id}
                         </Link>
-                        <AddressLink value={m.subscriber} />
+                        <AddressDisplay value={m.subscriber} />
                         <Badge status={m.status} />
                         {badge && (
                           <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent">
@@ -3034,7 +3035,7 @@ export default function MerchantPage() {
                           >
                             #{m.id}
                           </Link>
-                          <AddressLink value={m.subscriber} />
+                          <AddressDisplay value={m.subscriber} />
                           <Badge status={m.status} />
                           {badge && (
                             <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent">

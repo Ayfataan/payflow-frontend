@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { config } from "./config";
+import type { rpc as StellarRpc } from "@stellar/stellar-sdk";
 
 /**
  * Reflector Oracle Contract IDs:
@@ -23,6 +24,7 @@ export interface OraclePrice {
 
 let cachedPrice: OraclePrice | null = null;
 let inflightFetch: Promise<OraclePrice | null> | null = null;
+let cachedRpcClient: { url: string; client: StellarRpc.Server } | null = null;
 
 /**
  * Resolve the Reflector oracle contract address for the active network.
@@ -44,6 +46,17 @@ export function getReflectorOracleId(): string {
 export function clearPriceCache(): void {
   cachedPrice = null;
   inflightFetch = null;
+  cachedRpcClient = null;
+}
+
+export function getRpcClient(
+  url: string,
+  create: (endpoint: string) => StellarRpc.Server,
+): StellarRpc.Server {
+  if (cachedRpcClient?.url !== url) {
+    cachedRpcClient = { url, client: create(url) };
+  }
+  return cachedRpcClient.client;
 }
 
 /**
@@ -81,7 +94,7 @@ export async function fetchXlmUsdPrice(options?: {
       const { Account, Contract, TransactionBuilder, rpc, scValToNative, xdr } =
         await import("@stellar/stellar-sdk");
 
-      const server = new rpc.Server(rpcUrl);
+      const server = getRpcClient(rpcUrl, (url) => new rpc.Server(url));
       const contract = new Contract(oracleId);
 
       // 1. Query decimals()

@@ -12,7 +12,7 @@ export function presentation(locale: f.Locale) {
     const units = [[86_400, "day"], [3_600, "hour"], [60, "minute"], [1, "second"]] as const;
     const [size, unit] = units.find(([size]) => seconds >= size && seconds % size === 0) ?? units[3];
     const count = seconds / size;
-    return new Intl.NumberFormat(f.localeTag(locale), { style: "unit", unit, unitDisplay: "long" }).format(count);
+    return f.formatUnit(count, unit, locale);
   }
   function discountLabel(bps: number, charges: number) {
     const percent = f.formatFeeBps(bps, locale);
@@ -28,7 +28,7 @@ export function presentation(locale: f.Locale) {
     discountBadge: (source: HasDiscount | null | undefined) => discountBps(source) && discountCharges(source) ? discountLabel(discountBps(source), discountCharges(source)) : null,
     discountLabel,
     unitLabel: (unit: { name: string }) => t(unit.name === "week" ? "Weeks" : unit.name === "month" ? "Months" : "Days"),
-    formatBucketLabel: (start: number) => new Intl.DateTimeFormat(f.localeTag(locale), { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(start * 1000)),
+    formatBucketLabel: (start: number) => f.formatBucketDate(start, locale),
     bucketTitle: (start: number, size: BucketSize) => size === "week" ? t("Week of {0}", { 0: f.formatDate(start, locale) }) : f.formatDate(start, locale),
     describeSeries: (points: RevenuePoint[], size: BucketSize, render: (value: bigint) => string) => {
       if (locale === "en") return englishDescribeSeries(points, size, render);

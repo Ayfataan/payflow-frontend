@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AddressLink, Notice, Skeleton, TxLink } from "@/components/ui";
-import { downloadReceipt, loadReceipt, parseReceiptParams, type ReceiptData } from "@/lib/receipt";
+import { copyToClipboard } from "@/lib/clipboard";
+import { downloadReceipt, loadReceipt, parseReceiptParams, receiptShareUrl, type ReceiptData } from "@/lib/receipt";
 
 function ReceiptSkeleton() {
   const { t: tr } = useI18n();
@@ -38,36 +39,42 @@ function ReceiptContent() {
   const txParam = searchParams.get("tx");
   const mandateParam = searchParams.get("mandate");
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [apiAvailable, setApiAvailable] = useState(true);
+  const [shareState, setShareState] = useState<"idle" | "copied" | "error">("idle");
+  const [resolvedRequest, setResolvedRequest] = useState<string | null>(null);
+  const { txHash, mandateId, error: parameterError } = parseReceiptParams({
+    tx: txParam,
+    mandate: mandateParam,
+  });
+  const requestKey = JSON.stringify([txHash, mandateId]);
 
   useEffect(() => {
-    const { txHash, mandateId, error: parseError } = parseReceiptParams({
-      tx: txParam,
-      mandate: mandateParam,
-    });
-
-    if (parseError || !txHash || mandateId === null) {
-      setError(parseError || "Invalid receipt parameters.");
-      setLoading(false);
-      return;
-    }
+    if (parameterError || !txHash || mandateId === null) return;
 
     let active = true;
     void loadReceipt(mandateId, txHash).then((res) => {
       if (!active) return;
       setReceipt(res.receipt);
       setApiAvailable(res.apiAvailable);
-      setError(res.error);
-      setLoading(false);
+      setLoadError(res.error);
+      setShareState("idle");
+      setResolvedRequest(requestKey);
+    }).catch((cause: unknown) => {
+      if (!active) return;
+      setLoadError(cause instanceof Error ? cause.message : String(cause));
+      setReceipt(null);
+      setResolvedRequest(requestKey);
     });
 
     return () => {
       active = false;
     };
-  }, [txParam, mandateParam]);
+  }, [mandateId, parameterError, requestKey, txHash]);
+
+  const loading = !parameterError && resolvedRequest !== requestKey;
+  const error = parameterError ?? (resolvedRequest === requestKey ? loadError : null);
 
   if (loading) {
     return <ReceiptSkeleton />;
@@ -102,6 +109,11 @@ function ReceiptContent() {
   const grossFormatted = formatAmount(receipt.gross, receipt.tokenMeta);
   const feeFormatted = formatAmount(receipt.fee, receipt.tokenMeta);
   const netFormatted = formatAmount(receipt.net, receipt.tokenMeta);
+  const shareReceipt = async () => {
+    const url = receiptShareUrl(window.location.href, receipt);
+    const copied = await copyToClipboard(url);
+    setShareState(copied ? "copied" : "error");
+  };
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 py-2 print:max-w-none print:space-y-3 print:py-0">
@@ -112,6 +124,14 @@ function ReceiptContent() {
           className="text-sm text-muted transition hover:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >{tr("← Back to overview")}</Link>
         <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void shareReceipt()}
+          className="btn-ghost"
+          aria-label={tr("Share this receipt")}
+        >
+          {tr("Share")}
+        </button>
         <button
           type="button"
           onClick={() => downloadReceipt(receipt)}
@@ -157,6 +177,13 @@ function ReceiptContent() {
           <span>{tr("Print receipt")}</span>
         </button>
         </div>
+        <span role="status" aria-live="polite" className="sr-only">
+          {shareState === "copied"
+            ? tr("Receipt link copied")
+            : shareState === "error"
+              ? tr("Could not copy receipt link")
+              : ""}
+        </span>
       </div>
 
       {/* Contract-only explanation banner when API data is unavailable */}

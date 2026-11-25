@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { checkAmount, parseAmount } from "@/lib/format";
-import { formatAmount, formatDate, formatExactTime, formatPeriod, formatUsdString, formatWhen } from "@/i18n/format";
+import { formatAmount, formatDate, formatExactTime, formatPeriod, formatUsdString, formatWhen, numberFormatterFor } from "@/i18n/format";
 import { createTranslation, translateMessage } from "@/i18n/translate";
 import { presentation } from "@/i18n/presentation";
 import en from "@/i18n/en.json";
 import fr from "@/i18n/fr.json";
 
 describe("English and French financial presentation", () => {
+  it("reuses number formatter instances per locale without sharing across locales", () => {
+    expect(numberFormatterFor("en")).toBe(numberFormatterFor("en"));
+    expect(numberFormatterFor("fr")).toBe(numberFormatterFor("fr"));
+    expect(numberFormatterFor("en")).not.toBe(numberFormatterFor("fr"));
+  });
   it("keeps adjacent stroops beyond Number.MAX_SAFE_INTEGER distinct", () => {
     expect(formatAmount(90071992547409931n, "fr", undefined, 7)).toBe("9\u202f007\u202f199\u202f254,7409931 XLM");
     expect(formatAmount(90071992547409932n, "fr", undefined, 7)).toBe("9\u202f007\u202f199\u202f254,7409932 XLM");

@@ -62,6 +62,18 @@ export function parseReceiptParams(params: {
   };
 }
 
+export function receiptShareUrl(
+  currentUrl: string,
+  receipt: Pick<ReceiptData, "txHash" | "mandateId">,
+): string {
+  const url = new URL(currentUrl);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("tx", receipt.txHash);
+  url.searchParams.set("mandate", String(receipt.mandateId));
+  return url.toString();
+}
+
 const MONTHS = [
   "Jan",
   "Feb",

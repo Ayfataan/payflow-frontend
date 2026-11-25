@@ -334,7 +334,9 @@ export function WalletLayoutInner({ children }: { children: React.ReactNode }) {
 
         {/* One landmark only: the skip link targets this id. */}
         <main id="main-content" className="flex-1 space-y-8 py-8 print:py-0">
-          <Activity />
+          <div className="print:hidden">
+            <Activity />
+          </div>
           {children}
         </main>
 

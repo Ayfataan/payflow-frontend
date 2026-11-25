@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   type ApiActivityType,
@@ -11,6 +11,8 @@ import { config } from "@/lib/config";
 import { formatAmount, type TokenMeta } from "@/lib/format";
 import { useWallet } from "@/lib/wallet";
 import { Empty, Notice, Panel, SkeletonRows } from "@/components/ui";
+
+const ActivityVirtualList = lazy(() => import("@/components/ActivityVirtualList"));
 
 const SEEN_PREFIX = "payflow.activity.seen.";
 
@@ -116,6 +118,46 @@ function eventDescription(event: ActivityItem): string {
     case "subscribed":
       return "Mandate subscribed";
   }
+}
+
+function ActivityRow({
+  item,
+  isNew,
+  virtualized = false,
+}: {
+  item: ActivityItem;
+  isNew: boolean;
+  virtualized?: boolean;
+}) {
+  const Row = virtualized ? "div" : "li";
+  const contentClass = virtualized ? "truncate" : "break-words";
+  const description = eventDescription(item);
+  return (
+    <Row
+      className={
+        virtualized
+          ? "mb-3 flex h-[88px] min-w-0 items-center justify-between gap-3 overflow-hidden rounded-lg border border-edge p-3"
+          : "flex min-w-0 items-start justify-between gap-3 rounded-lg border border-edge p-3"
+      }
+    >
+      <div className="min-w-0">
+        <p
+          className={`${contentClass} text-sm font-medium`}
+          title={virtualized ? description : undefined}
+        >
+          {description}
+        </p>
+        <p className={`mt-1 ${contentClass} text-xs text-muted`}>
+          {labelFor(item.type)} | mandate #{item.mandate_id} | ledger {item.ledger}
+        </p>
+      </div>
+      {isNew ? (
+        <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent">
+          New
+        </span>
+      ) : null}
+    </Row>
+  );
 }
 
 async function loadActivity(address: string): Promise<ActivityLoad | null> {
@@ -237,6 +279,14 @@ export function Activity() {
     writeSeen(address, next);
   };
 
+  const keyExtractor = useCallback((item: ActivityItem) => item.identity, []);
+  const renderItem = useCallback(
+    (item: ActivityItem) => (
+      <ActivityRow item={item} isNew={!visibleSeen.has(item.identity)} virtualized />
+    ),
+    [visibleSeen],
+  );
+
   if (!api.isConfigured() || !address) return null;
 
   return (
@@ -281,26 +331,25 @@ export function Activity() {
         <Empty>No activity yet.</Empty>
       ) : null}
       {!loading && !failed && visibleItems.length > 0 ? (
-        <ol className="space-y-3" aria-label="Wallet activity">
-          {visibleItems.map((item) => (
-            <li
-              key={item.identity}
-              className="flex min-w-0 items-start justify-between gap-3 rounded-lg border border-edge p-3"
-            >
-              <div className="min-w-0">
-                <p className="break-words text-sm font-medium">{eventDescription(item)}</p>
-                <p className="mt-1 break-words text-xs text-muted">
-                  {labelFor(item.type)} | mandate #{item.mandate_id} | ledger {item.ledger}
-                </p>
-              </div>
-              {!visibleSeen.has(item.identity) ? (
-                <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent">
-                  New
-                </span>
-              ) : null}
-            </li>
-          ))}
-        </ol>
+        visibleItems.length > 100 ? (
+          <Suspense fallback={<SkeletonRows rows={3} label="Loading activity list" />}>
+            <ActivityVirtualList
+              items={visibleItems}
+              keyExtractor={keyExtractor}
+              renderItem={renderItem}
+            />
+          </Suspense>
+        ) : (
+          <ol className="space-y-3" aria-label="Wallet activity">
+            {visibleItems.map((item) => (
+              <ActivityRow
+                key={item.identity}
+                item={item}
+                isNew={!visibleSeen.has(item.identity)}
+              />
+            ))}
+          </ol>
+        )
       ) : null}
     </Panel>
   );

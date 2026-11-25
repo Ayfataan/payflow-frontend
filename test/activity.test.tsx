@@ -1,6 +1,6 @@
 ﻿// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Activity } from "@/components/Activity";
 
 const wallet = vi.hoisted(() => ({
@@ -230,5 +230,25 @@ describe("Activity", () => {
 
     resolveOld?.({ events: [event("old", 1, 1)] });
     await waitFor(() => expect(screen.queryByText(/ledger 1/)).toBeNull());
+  });
+
+  it("virtualizes long histories while preserving newest-first order and read actions", async () => {
+    apiMock.mandatesFor.mockResolvedValue({ mandates: [] });
+    apiMock.timeline.mockResolvedValue({
+      events: Array.from({ length: 150 }, (_, index) =>
+        event(`event-${index}`, 1, index + 1, { amount: `${index + 1}000000` }),
+      ),
+    });
+    const { container } = render(<Activity />);
+
+    const feed = await screen.findByRole("feed", { name: "Wallet activity" });
+    await waitFor(() => expect(feed.querySelectorAll('[role="article"]')).toHaveLength(14));
+    expect(feed.querySelector('[aria-posinset="1"]')?.textContent).toContain("Charged 150 USDC");
+    expect(feed.querySelector('[aria-setsize="150"]')).toBeTruthy();
+    expect(feed.querySelectorAll('[role="article"]').length).toBeLessThan(150);
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark all read" }));
+    await waitFor(() => expect(screen.queryAllByText("New")).toHaveLength(0));
+    expect(container.querySelector('[role="feed"]')).toBeTruthy();
   });
 });

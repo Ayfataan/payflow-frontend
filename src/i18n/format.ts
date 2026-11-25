@@ -1,23 +1,66 @@
 import { fromStroops, XLM, type TokenMeta } from "@/lib/format";
 export type Locale = "en" | "fr";
 export const localeTag = (locale: Locale) => locale === "fr" ? "fr-FR" : "en-GB";
+
+const numberFormatters = new Map<string, Intl.NumberFormat>();
+const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
+const relativeTimeFormatters = new Map<string, Intl.RelativeTimeFormat>();
+
+export function numberFormatterFor(
+  locale: Locale,
+  options: Intl.NumberFormatOptions = {},
+): Intl.NumberFormat {
+  const key = `${locale}:${JSON.stringify(options)}`;
+  let formatter = numberFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(localeTag(locale), options);
+    numberFormatters.set(key, formatter);
+  }
+  return formatter;
+}
+
+function dateTimeFormatterFor(
+  locale: Locale,
+  options: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  const key = `${locale}:${JSON.stringify(options)}`;
+  let formatter = dateTimeFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(localeTag(locale), options);
+    dateTimeFormatters.set(key, formatter);
+  }
+  return formatter;
+}
+
+function relativeTimeFormatterFor(locale: Locale): Intl.RelativeTimeFormat {
+  let formatter = relativeTimeFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.RelativeTimeFormat(localeTag(locale), { numeric: "always" });
+    relativeTimeFormatters.set(locale, formatter);
+  }
+  return formatter;
+}
+
 export function formatNumber(value: number | bigint, locale: Locale): string {
-  return new Intl.NumberFormat(localeTag(locale)).format(value);
+  return numberFormatterFor(locale).format(value);
 }
 /** Group the integer bigint and retain the decimal string; never coerce money to Number. */
 export function formatAmount(raw: string | bigint, locale: Locale, meta: TokenMeta = XLM, digits = 4): string {
   const canonical = fromStroops(raw, digits, meta.decimals);
   const [, sign = "", whole = "0", fraction] = /^(-?)(\d+)(?:\.(\d+))?$/.exec(canonical) ?? [];
-  const decimal = new Intl.NumberFormat(localeTag(locale)).formatToParts(1.1).find(part => part.type === "decimal")?.value ?? ".";
+  const decimal = numberFormatterFor(locale).formatToParts(1.1).find(part => part.type === "decimal")?.value ?? ".";
   return `${sign}${formatNumber(BigInt(whole), locale)}${fraction ? decimal + fraction : ""} ${meta.symbol}`;
 }
 export function formatDate(seconds: number, locale: Locale): string {
   if (!seconds) return "—";
-  return new Intl.DateTimeFormat(localeTag(locale), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(seconds * 1000));
+  return dateTimeFormatterFor(locale, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(seconds * 1000));
+}
+export function formatBucketDate(seconds: number, locale: Locale): string {
+  return dateTimeFormatterFor(locale, { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(seconds * 1000));
 }
 export function formatExactTime(seconds: number, locale: Locale): string {
   if (!seconds) return "—";
-  return new Intl.DateTimeFormat(localeTag(locale), { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(new Date(seconds * 1000)) + " UTC";
+  return dateTimeFormatterFor(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(new Date(seconds * 1000)) + " UTC";
 }
 export function formatWhen(seconds: number, locale: Locale, now = Date.now()): string {
   if (!seconds) return "—";
@@ -26,7 +69,7 @@ export function formatWhen(seconds: number, locale: Locale, now = Date.now()): s
   if (minutes < 1) return locale === "fr" ? (delta >= 0 ? "échéance immédiate" : "à l’instant") : (delta >= 0 ? "due now" : "just now");
   const hours = Math.round(minutes / 60);
   const [count, unit]: [number, Intl.RelativeTimeFormatUnit] = minutes < 60 ? [minutes, "minute"] : hours < 24 ? [hours, "hour"] : [Math.round(hours / 24), "day"];
-  return new Intl.RelativeTimeFormat(localeTag(locale), { numeric: "always" }).format(delta < 0 ? -count : count, unit);
+  return relativeTimeFormatterFor(locale).format(delta < 0 ? -count : count, unit);
 }
 export function formatPeriod(seconds: number, locale: Locale): string {
   const units = [
@@ -45,7 +88,15 @@ export function formatPeriod(seconds: number, locale: Locale): string {
   return locale === "fr" ? `toutes les ${formatNumber(seconds, locale)} secondes` : `every ${seconds}s`;
 }
 export function formatFeeBps(bps: number, locale: Locale): string {
-  return new Intl.NumberFormat(localeTag(locale), { style: "percent", maximumFractionDigits: 2 }).format(Number.isFinite(bps) && bps > 0 ? bps / 10_000 : 0);
+  return numberFormatterFor(locale, { style: "percent", maximumFractionDigits: 2 }).format(Number.isFinite(bps) && bps > 0 ? bps / 10_000 : 0);
+}
+
+export function formatUnit(
+  value: number,
+  unit: Intl.NumberFormatOptions["unit"],
+  locale: Locale,
+): string {
+  return numberFormatterFor(locale, { style: "unit", unit, unitDisplay: "long" }).format(value);
 }
 
 /** Localize the exact decimal output of the existing bigint oracle estimator. */
